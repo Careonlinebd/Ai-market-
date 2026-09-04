@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="bn" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Voice Copilot - AI TRADING HUB</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #0b0e14; color: #f1f5f9; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+  </style>
+</head>
+<body class="p-4 max-w-4xl mx-auto space-y-5">
+  <!-- Top Bar -->
+  <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+    <a href="index.html" class="text-xs font-mono text-blue-500 hover:underline">← Live Terminal</a>
+    <h1 class="text-base font-bold font-mono">GEMINI QUANT & BANGLA VOICE COPILOT</h1>
+  </div>
+
+  <!-- API Key Setup Box -->
+  <div class="p-3 bg-[#111722] border border-slate-800 rounded-lg text-xs space-y-2">
+    <div class="text-slate-300 font-bold">Gemini API Key Configuration:</div>
+    <div class="flex gap-2">
+      <input id="geminiKey" type="password" placeholder="AIzaSy... (Enter your Google Gemini API Key)" class="flex-1 bg-[#182232] border border-slate-700 rounded p-2 text-white font-mono" />
+      <button onclick="saveApiKey()" class="px-4 py-2 bg-blue-600 rounded font-bold text-white">Save</button>
+    </div>
+  </div>
+
+  <!-- Voice Assistant Interaction Box -->
+  <div class="bg-[#111722] border border-slate-800 rounded-xl p-5 text-center space-y-4">
+    <div class="text-xs text-slate-400">নিচের মাইক বাটনে চাপ দিয়ে বাংলায় কথা বলুন (যেমন: <i>"BTC মার্কেট অ্যানালাইসিস করো"</i>)</div>
+    
+    <button id="micBtn" onclick="toggleVoice()" class="h-16 w-16 mx-auto rounded-full bg-blue-600 hover:bg-blue-700 flex items-center justify-center text-white shadow-xl transition">
+      <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg>
+    </button>
+    
+    <div id="voiceStatus" class="text-xs font-mono text-slate-400">মাইক্রোফোন বন্ধ রয়েছে</div>
+  </div>
+
+  <!-- Structured AI Response Output -->
+  <div id="aiOutput" class="hidden bg-[#111722] border border-slate-800 rounded-xl p-5 space-y-4">
+    <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+      <span class="text-xs font-bold font-mono text-blue-400 uppercase">AI Quantitative Confluence Result</span>
+      <span id="aiScore" class="text-xs font-mono px-2 py-0.5 bg-blue-600/20 text-blue-400 rounded">85% Confidence</span>
+    </div>
+
+    <div class="p-3 bg-blue-950/30 border border-blue-800/40 rounded-lg text-sm text-slate-200 leading-relaxed" id="banglaVoiceText">
+      <!-- Bengali summary will appear here -->
+    </div>
+
+    <div class="grid grid-cols-2 gap-3 text-xs font-mono">
+      <div class="p-2.5 bg-[#182232] rounded border border-slate-700">
+        <span class="text-slate-400 block text-[10px]">Bias</span>
+        <span id="aiBias" class="text-emerald-400 font-bold">BULLISH</span>
+      </div>
+      <div class="p-2.5 bg-[#182232] rounded border border-slate-700">
+        <span class="text-slate-400 block text-[10px]">Risk Assessment</span>
+        <span id="aiRisk" class="text-yellow-400 font-bold">MODERATE</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let isListening = false;
+    let recognition;
+
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SpeechRecognition();
+      recognition.lang = 'bn-BD'; // Bangla Speech recognition
+      recognition.continuous = false;
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        document.getElementById("voiceStatus").innerText = `শোনা গেছে: "${transcript}"`;
+        runGeminiAnalysis(transcript);
+        stopMic();
+      };
+
+      recognition.onerror = () => stopMic();
+      recognition.onend = () => stopMic();
+    }
+
+    function toggleVoice() {
+      if (!recognition) {
+        alert("আপনার ব্রাউজারে ভয়েস রিকগনিশন সাপোর্ট নেই। গুগল ক্রোম ব্যবহার করুন।");
+        return;
+      }
+      if (isListening) stopMic();
+      else startMic();
+    }
+
+    function startMic() {
+      isListening = true;
+      recognition.start();
+      document.getElementById("micBtn").classList.add("bg-rose-600", "animate-pulse");
+      document.getElementById("voiceStatus").innerText = "শুনছি... এখন কথা বলুন...";
+    }
+
+    function stopMic() {
+      isListening = false;
+      document.getElementById("micBtn").classList.remove("bg-rose-600", "animate-pulse");
+      document.getElementById("voiceStatus").innerText = "মাইক্রোফোন বন্ধ রয়েছে";
+    }
+
+    function saveApiKey() {
+      const key = document.getElementById("geminiKey").value.trim();
+      if (key) {
+        localStorage.setItem("gemini_key", key);
+        alert("Gemini API Key সংরক্ষিত হয়েছে!");
+      }
+    }
+
+    async function runGeminiAnalysis(userQuery) {
+      const apiKey = localStorage.getItem("gemini_key") || document.getElementById("geminiKey").value.trim();
+      if (!apiKey) {
+        alert("অনুগ্রহ করে আপনার Gemini API Key ইনপুট দিন।");
+        return;
+      }
+
+      document.getElementById("voiceStatus").innerText = "AI চিন্তা করছে এবং মার্কেট হিসাব করছে...";
+
+      const prompt = `
+You are the AI TRADING HUB Quant Analyst. 
+Analyze the market query: "${userQuery}".
+Return JSON ONLY (no markdown, no backticks):
+{
+  "bias": "BULLISH" or "BEARISH" or "NEUTRAL",
+  "score": 85,
+  "risk": "MODERATE",
+  "banglaSummary": "একটি পূর্ণাঙ্গ বাংলায় উত্তর যা ট্রেডারদের সাহায্য করবে।"
+}
+`;
+
+      try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+        });
+
+        const json = await res.json();
+        const rawText = json.candidates[0].content.parts[0].text.replace(/```json/g, "").replace(/```/g, "").trim();
+        const parsed = JSON.parse(rawText);
+
+        document.getElementById("aiOutput").classList.remove("hidden");
+        document.getElementById("aiBias").innerText = parsed.bias;
+        document.getElementById("aiScore").innerText = parsed.score + "% Confidence";
+        document.getElementById("aiRisk").innerText = parsed.risk;
+        document.getElementById("banglaVoiceText").innerText = parsed.banglaSummary;
+
+        // Speak Bangla Response Out Loud
+        speakBangla(parsed.banglaSummary);
+      } catch (err) {
+        alert("AI রেসপন্স পেতে সমস্যা হয়েছে: " + err.message);
+      }
+    }
+
+    function speakBangla(text) {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'bn-BD';
+        window.speechSynthesis.speak(utterance);
+      }
+    }
+  </script>
+</body>
+</html>

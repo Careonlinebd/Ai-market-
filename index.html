@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="bn" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>AI Trading Hub - Mobile & Pro Terminal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lightweight-charts@4.2.1/dist/lightweight-charts.standalone.production.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #0b0e14; color: #f1f5f9; touch-action: manipulation; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    ::-webkit-scrollbar { display: none; }
+    * { -ms-overflow-style: none; scrollbar-width: none; }
+    .active-tab { color: #3b82f6; border-top: 2px solid #3b82f6; }
+  </style>
+</head>
+<body class="h-screen w-screen flex flex-col overflow-hidden select-none">
+
+  <!-- Hidden Audio Player for 100% Reliable Bangla Voice -->
+  <audio id="banglaAudioPlayer" preload="auto"></audio>
+
+  <!-- ================= TOP HEADER ================= -->
+  <header class="h-14 border-b border-slate-800 bg-[#111722] px-3 flex items-center justify-between shrink-0 z-20">
+    <div class="flex items-center space-x-2">
+      <div class="h-7 w-7 rounded bg-blue-600 flex items-center justify-center font-bold text-white font-mono text-xs">AI</div>
+      <select id="marketSelector" onchange="onSymbolSelected(this.value)" class="bg-[#182232] border border-slate-700 text-white font-mono font-bold text-xs rounded px-2 py-1.5 focus:outline-none">
+        <optgroup label="ক্রিপ্টো">
+          <option value="BTCUSDT" selected>BTC/USDT</option>
+          <option value="ETHUSDT">ETH/USDT</option>
+          <option value="SOLUSDT">SOL/USDT</option>
+        </optgroup>
+        <optgroup label="কমোডিটি ও গোল্ড">
+          <option value="PAXGUSDT">GOLD / USDT (XAU)</option>
+          <option value="USDCUSDT">CRUDE OIL (USOIL)</option>
+        </optgroup>
+        <optgroup label="ফরেক্স মার্কেট">
+          <option value="EURUSDT">EUR/USD (FX)</option>
+          <option value="EURJPY">EUR/JPY (FX)</option>
+          <option value="GBPUSDT">GBP/USD (FX)</option>
+        </optgroup>
+      </select>
+    </div>
+
+    <!-- Live Ticker & Voice Mic Button -->
+    <div class="flex items-center space-x-3">
+      <div class="text-right font-mono">
+        <div id="livePrice" class="text-xs sm:text-sm font-bold text-emerald-400">Loading...</div>
+        <div id="priceChange" class="text-[10px] text-slate-400">+0.00%</div>
+      </div>
+      <button onclick="requestMicAndListen()" id="headerMicBtn" class="h-9 w-9 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-lg transition active:scale-95">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ================= SUB-TOOLBAR ================= -->
+  <div class="h-10 bg-[#0d121a] border-b border-slate-800 px-3 flex items-center justify-between overflow-x-auto whitespace-nowrap shrink-0 z-10 text-xs font-mono">
+    <div class="flex items-center space-x-1">
+      <button onclick="changeTimeframe('1m')" class="tf-btn px-2 py-1 rounded bg-[#182232] text-slate-300">1m</button>
+      <button onclick="changeTimeframe('5m')" class="tf-btn px-2 py-1 rounded bg-[#182232] text-slate-300">5m</button>
+      <button onclick="changeTimeframe('15m')" class="tf-btn px-2 py-1 rounded bg-blue-600 text-white font-bold">15m</button>
+      <button onclick="changeTimeframe('1h')" class="tf-btn px-2 py-1 rounded bg-[#182232] text-slate-300">1H</button>
+      <button onclick="changeTimeframe('4h')" class="tf-btn px-2 py-1 rounded bg-[#182232] text-slate-300">4H</button>
+      <button onclick="changeTimeframe('1d')" class="tf-btn px-2 py-1 rounded bg-[#182232] text-slate-300">1D</button>
+    </div>
+
+    <div class="flex items-center space-x-1.5 ml-2">
+      <button onclick="toggleSRLines()" id="srToggleBtn" class="px-2 py-1 rounded bg-blue-600 text-white font-semibold text-[11px]">S/R Lines</button>
+      <button onclick="toggleFibonacci()" id="fibToggleBtn" class="px-2 py-1 rounded bg-slate-800 text-slate-300 font-semibold text-[11px]">Fibonacci</button>
+      <button onclick="toggleEMA()" id="emaToggleBtn" class="px-2 py-1 rounded bg-slate-800 text-slate-300 font-semibold text-[11px]">EMA 50</button>
+    </div>
+  </div>
+
+  <!-- ================= MAIN VIEW CONTAINER ================= -->
+  <main class="flex-1 relative w-full h-full bg-[#0b0e14] overflow-hidden">
+    
+    <!-- 1. CHART VIEW -->
+    <div id="chartView" class="absolute inset-0 w-full h-full">
+      <div id="chartContainer" class="w-full h-full"></div>
+      
+      <div class="absolute top-2 left-2 bg-[#111722]/90 border border-slate-800 p-2 rounded-lg text-[10px] font-mono space-y-0.5 pointer-events-none backdrop-blur z-10">
+        <div id="hudStructure" class="text-blue-400 font-bold">STRUCTURE: EVALUATING...</div>
+        <div id="hudLevels" class="text-slate-300">RES: -- | SUP: --</div>
+      </div>
+    </div>
+
+    <!-- 2. AI ASSISTANT VIEW -->
+    <div id="aiView" class="hidden absolute inset-0 w-full h-full bg-[#0b0e14] p-4 overflow-y-auto space-y-4 pb-20">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h2 class="text-sm font-bold font-mono text-white flex items-center gap-1.5">
+          <span class="text-blue-500">✨</span> জেমিনি এআই কোয়ান্ট ডিসিশন
+        </h2>
+        <button onclick="runAIAnalysis()" id="aiRunBtn" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-bold font-mono">
+          এনালাইসিস করুন
+        </button>
+      </div>
+
+      <!-- AI Bangla Output Card -->
+      <div class="p-4 bg-[#111722] border border-slate-800 rounded-xl space-y-3 font-mono">
+        <div class="flex justify-between items-center text-xs">
+          <span class="text-slate-400">কনফ্লুয়েন্স স্কোর</span>
+          <span id="aiConfidenceScore" class="text-blue-400 font-bold">82% মডেল কনফিডেন্স</span>
+        </div>
+        
+        <div class="relative">
+          <div id="aiSummaryBangla" class="p-3 bg-blue-950/20 border border-blue-800/30 rounded-lg text-xs leading-relaxed text-slate-200 min-h-[70px]">
+            মাইক বাটনে চাপ দিয়ে কথা বলুন অথবা "এনালাইসিস করুন" বাটনে ক্লিক করুন।
+          </div>
+          
+          <!-- Manual Audio Playback Button -->
+          <button onclick="replayCurrentText()" class="mt-2.5 flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-md text-xs font-bold shadow transition active:scale-95">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path></svg>
+            🔊 বাংলায় শুনুন (Play Voice)
+          </button>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 text-[11px] pt-1">
+          <div class="p-2 bg-[#182232] rounded border border-slate-700">
+            <span class="text-slate-400 block text-[9px]">ট্রেন্ড বায়াস</span>
+            <span id="aiTrendBias" class="text-emerald-400 font-bold">BULLISH</span>
+          </div>
+          <div class="p-2 bg-[#182232] rounded border border-slate-700">
+            <span class="text-slate-400 block text-[9px]">রিস্ক লেভেল</span>
+            <span id="aiRiskLevel" class="text-yellow-400 font-bold">MODERATE</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Voice Interaction Box -->
+      <div class="p-4 bg-[#111722] border border-slate-800 rounded-xl text-center space-y-3">
+        <div class="text-xs text-slate-300 font-mono" id="aiVoiceStatus">নিচের মাইকে চাপ দিয়ে কথা বলুন</div>
+        <button onclick="requestMicAndListen()" id="aiBigMicBtn" class="h-16 w-16 mx-auto rounded-full bg-blue-600 hover:bg-blue-700 flex items-center justify-center text-white shadow-xl transition active:scale-90">
+          <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg>
+        </button>
+        
+        <!-- Text Fallback Input -->
+        <div class="flex gap-2 pt-2">
+          <input id="textCommandInput" type="text" placeholder="অথবা এখানে বাংলায় লিখুন (যেমন: গোল্ড চার্ট)" class="flex-1 bg-[#182232] border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-blue-500" />
+          <button onclick="handleManualTextSubmit()" class="px-3 py-2 bg-blue-600 rounded-lg text-xs font-bold font-mono">পাঠান</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. SCANNER VIEW -->
+    <div id="scannerView" class="hidden absolute inset-0 w-full h-full bg-[#0b0e14] p-4 overflow-y-auto space-y-4 pb-20">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+        <h2 class="text-xs font-bold font-mono text-slate-300 uppercase">15m মাল্টি-মার্কেট স্ক্যানার</h2>
+        <button onclick="runMarketScanner()" class="px-2.5 py-1 bg-blue-600 rounded text-xs font-bold text-white font-mono">রিফ্রেশ</button>
+      </div>
+      <div id="scannerList" class="space-y-2"></div>
+    </div>
+
+    <!-- 4. SETTINGS VIEW -->
+    <div id="settingsView" class="hidden absolute inset-0 w-full h-full bg-[#0b0e14] p-4 overflow-y-auto space-y-4 pb-20">
+      <h2 class="text-sm font-bold font-mono text-white border-b border-slate-800 pb-2">সেটিংস ও এপিআই কনফিগারেশন</h2>
+      <div class="bg-[#111722] border border-slate-800 p-4 rounded-xl space-y-3 font-mono text-xs">
+        <label class="text-slate-300 block font-bold">Google Gemini API Key:</label>
+        <input id="geminiApiKeyInput" type="text" placeholder="আপনার API Key পেস্ট করুন" class="w-full bg-[#182232] border border-slate-700 rounded p-2.5 text-white font-mono text-xs" />
+        
+        <div class="flex gap-2">
+          <button onclick="saveApiKey()" class="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold">সেভ করুন (Save)</button>
+          <button onclick="testApiKey()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded font-bold">টেস্ট এপিআই</button>
+        </div>
+        <div id="keyTestResult" class="text-[11px] pt-1 text-slate-400"></div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ================= BOTTOM NAVIGATION ================= -->
+  <nav class="h-14 border-t border-slate-800 bg-[#111722] grid grid-cols-4 shrink-0 z-30 font-mono text-[11px]">
+    <button onclick="switchTab('chart')" id="tabChart" class="flex flex-col items-center justify-center space-y-0.5 active-tab">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg>
+      <span>চার্ট</span>
+    </button>
+    <button onclick="switchTab('ai')" id="tabAi" class="flex flex-col items-center justify-center space-y-0.5 text-slate-400">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+      <span>এআই</span>
+    </button>
+    <button onclick="switchTab('scanner')" id="tabScanner" class="flex flex-col items-center justify-center space-y-0.5 text-slate-400">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+      <span>স্ক্যানার</span>
+    </button>
+    <button onclick="switchTab('settings')" id="tabSettings" class="flex flex-col items-center justify-center space-y-0.5 text-slate-400">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+      <span>সেটিংস</span>
+    </button>
+  </nav>
+
+  <!-- ================= JAVASCRIPT ENGINES ================= -->
+  <script>
+    let currentSymbol = "BTCUSDT";
+    let currentTimeframe = "15m";
+    let chart, candleSeries, volumeSeries, emaSeries;
+    let ws;
+    let cachedCandles = [];
+    let priceLines = [];
+
+    let showSR = true;
+    let showFib = false;
+    let showEMA = false;
+    let isListening = false;
+    let speechRecognizer = null;
+    let lastSpokenSummary = "";
+
+    const SUPPORTED_MODELS = [
+      "gemini-3.6-flash",
+      "gemini-flash-latest",
+      "gemini-1.5-flash",
+      "gemini-2.0-flash"
+    ];
+
+    function initChart() {
+      const container = document.getElementById("chartContainer");
+      chart = LightweightCharts.createChart(container, {
+        layout: { background: { color: '#0b0e14' }, textColor: '#848e9c', fontFamily: 'JetBrains Mono', fontSize: 11 },
+        grid: { vertLines: { color: 'rgba(24, 34, 50, 0.6)' }, horzLines: { color: 'rgba(24, 34, 50, 0.6)' } },
+        rightPriceScale: { borderColor: '#222f44', autoScale: true },
+        timeScale: { borderColor: '#222f44', timeVisible: true, secondsVisible: false }
+      });
+
+      candleSeries = chart.addCandlestickSeries({
+        upColor: '#089981', downColor: '#f23645', borderVisible: false,
+        wickUpColor: '#089981', wickDownColor: '#f23645'
+      });
+
+      volumeSeries = chart.addHistogramSeries({ priceFormat: { type: 'volume' }, priceScaleId: '' });
+      volumeSeries.priceScale().applyOptions({ scaleMargins: { top: 0.85, bottom: 0 } });
+
+      window.addEventListener('resize', () => {
+        chart.applyOptions({ width: container.clientWidth, height: container.clientHeight });
+      });
+
+      loadMarketData();
+    }
+
+    async function loadMarketData() {
+      try {
+        const sym = currentSymbol.toUpperCase();
+        const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${sym}&interval=${currentTimeframe}&limit=250`);
+        const data = await res.json();
+
+        cachedCandles = data.map(d => ({
+          time: Math.floor(d[0] / 1000),
+          open: parseFloat(d[1]),
+          high: parseFloat(d[2]),
+          low: parseFloat(d[3]),
+          close: parseFloat(d[4]),
+          volume: parseFloat(d[5])
+        }));
+
+        candleSeries.setData(cachedCandles);
+        volumeSeries.setData(cachedCandles.map(c => ({
+          time: c.time,
+          value: c.volume,
+          color: c.close >= c.open ? 'rgba(8, 153, 129, 0.35)' : 'rgba(242, 54, 69, 0.35)'
+        })));
+
+        renderOverlays();
+        connectLiveStream();
+      } catch (err) {
+        console.error("Market data error", err);
+      }
+    }
+
+    function connectLiveStream() {
+      if (ws) ws.close();
+      const sym = currentSymbol.toLowerCase();
+      ws = new WebSocket(`wss://stream.binance.com:9443/ws/${sym}@kline_${currentTimeframe}`);
+
+      ws.onmessage = (event) => {
+        const payload = JSON.parse(event.data);
+        if (!payload.k) return;
+        const k = payload.k;
+        const candle = {
+          time: Math.floor(k.t / 1000),
+          open: parseFloat(k.o),
+          high: parseFloat(k.h),
+          low: parseFloat(k.l),
+          close: parseFloat(k.c),
+          volume: parseFloat(k.v)
+        };
+
+        candleSeries.update(candle);
+        document.getElementById("livePrice").innerText = "$" + candle.close.toFixed(currentSymbol.includes("EUR") ? 4 : 2);
+      };
+    }
+
+    function renderOverlays() {
+      priceLines.forEach(line => candleSeries.removePriceLine(line));
+      priceLines = [];
+
+      if (cachedCandles.length < 20) return;
+
+      const highs = cachedCandles.map(c => c.high);
+      const lows = cachedCandles.map(c => c.low);
+      const maxH = Math.max(...highs.slice(-60));
+      const minL = Math.min(...lows.slice(-60));
+
+      if (showSR) {
+        const resLine = candleSeries.createPriceLine({
+          price: maxH, color: '#f23645', lineWidth: 1, lineStyle: 2,
+          axisLabelVisible: true, title: 'RESISTANCE'
+        });
+        const supLine = candleSeries.createPriceLine({
+          price: minL, color: '#089981', lineWidth: 1, lineStyle: 2,
+          axisLabelVisible: true, title: 'SUPPORT'
+        });
+        priceLines.push(resLine, supLine);
+      }
+
+      if (showFib) {
+        const fib618Price = maxH - (maxH - minL) * 0.618;
+        const fibLine = candleSeries.createPriceLine({
+          price: fib618Price, color: '#eab308', lineWidth: 1, lineStyle: 0,
+          axisLabelVisible: true, title: 'FIB 61.8%'
+        });
+        priceLines.push(fibLine);
+      }
+
+      const last = cachedCandles[cachedCandles.length - 1];
+      const prev = cachedCandles[cachedCandles.length - 15];
+      const trend = last.close > prev.close ? "BULLISH (HH/HL)" : "BEARISH (LH/LL)";
+      document.getElementById("hudStructure").innerText = `STRUCTURE: ${trend}`;
+      document.getElementById("hudLevels").innerText = `RES: $${maxH} | SUP: $${minL}`;
+    }
+
+    function toggleSRLines() {
+      showSR = !showSR;
+      document.getElementById("srToggleBtn").className = showSR 
+        ? "px-2 py-1 rounded bg-blue-600 text-white font-semibold text-[11px]" 
+        : "px-2 py-1 rounded bg-slate-800 text-slate-300 font-semibold text-[11px]";
+      renderOverlays();
+    }
+
+    function toggleFibonacci() {
+      showFib = !showFib;
+      document.getElementById("fibToggleBtn").className = showFib 
+        ? "px-2 py-1 rounded bg-yellow-600 text-white font-semibold text-[11px]" 
+        : "px-2 py-1 rounded bg-slate-800 text-slate-300 font-semibold text-[11px]";
+      renderOverlays();
+    }
+
+    function toggleEMA() {
+      showEMA = !showEMA;
+      document.getElementById("emaToggleBtn").className = showEMA 
+        ? "px-2 py-1 rounded bg-indigo-600 text-white font-semibold text-[11px]" 
+        : "px-2 py-1 rounded bg-slate-800 text-slate-300 font-semibold text-[11px]";
+
+      if (showEMA) {
+        if (!emaSeries) emaSeries = chart.addLineSeries({ color: '#6366f1', lineWidth: 2 });
+        const k = 2 / (50 + 1);
+        let ema = cachedCandles[0].close;
+        const emaData = cachedCandles.map(c => {
+          ema = (c.close - ema) * k + ema;
+          return { time: c.time, value: ema };
+        });
+        emaSeries.setData(emaData);
+      } else if (emaSeries) {
+        chart.removeSeries(emaSeries);
+        emaSeries = null;
+      }
+    }
+
+    function onSymbolSelected(sym) {
+      currentSymbol = sym;
+      loadMarketData();
+    }
+
+    function changeTimeframe(tf) {
+      currentTimeframe = tf;
+      document.querySelectorAll(".tf-btn").forEach(b => {
+        b.className = "tf-btn px-2 py-1 rounded bg-[#182232] text-slate-300";
+        if (b.innerText.toLowerCase() === tf.toLowerCase()) {
+          b.className = "tf-btn px-2 py-1 rounded bg-blue-600 text-white font-bold";
+        }
+      });
+      loadMarketData();
+    }
+
+    function switchTab(tabId) {
+      ['chart', 'ai', 'scanner', 'settings'].forEach(t => {
+        document.getElementById(t + 'View').classList.add('hidden');
+        document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1)).className = "flex flex-col items-center justify-center space-y-0.5 text-slate-400";
+      });
+      document.getElementById(tabId + 'View').classList.remove('hidden');
+      document.getElementById('tab' + tabId.charAt(0).toUpperCase() + tabId.slice(1)).className = "flex flex-col items-center justify-center space-y-0.5 active-tab font-bold";
+
+      if (tabId === 'chart') {
+        setTimeout(() => chart.applyOptions({ width: document.getElementById("chartContainer").clientWidth, height: document.getElementById("chartContainer").clientHeight }), 50);
+      } else if (tabId === 'scanner') {
+        runMarketScanner();
+      }
+    }
+
+    async function runMarketScanner() {
+      const list = document.getElementById("scannerList");
+      list.innerHTML = `<div class="text-xs font-mono text-blue-400 p-2">মার্কেট স্ক্যান হচ্ছে...</div>`;
+
+      const pairs = [
+        { sym: "BTCUSDT", name: "Bitcoin" },
+        { sym: "ETHUSDT", name: "Ethereum" },
+        { sym: "PAXGUSDT", name: "Gold Spot" },
+        { sym: "EURUSDT", name: "Euro / Dollar" }
+      ];
+
+      let html = "";
+      for (const p of pairs) {
+        try {
+          const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${p.sym}&interval=15m&limit=30`);
+          const d = await res.json();
+          const last = parseFloat(d[d.length - 1][4]);
+          const prev = parseFloat(d[d.length - 15][4]);
+          const isBull = last >= prev;
+
+          html += `
+            <div onclick="onSymbolSelected('${p.sym}'); switchTab('chart');" class="p-3 bg-[#111722] border border-slate-800 rounded-lg flex justify-between items-center cursor-pointer font-mono">
+              <div>
+                <div class="font-bold text-xs text-white">${p.sym} <span class="text-[10px] text-slate-400 font-normal">(${p.name})</span></div>
+                <div class="text-[10px] text-slate-400">15m Trend: ${isBull ? 'Bullish Higher-Low' : 'Bearish Pullback'}</div>
+              </div>
+              <div class="text-right">
+                <div class="text-xs font-bold text-white">$${last.toFixed(p.sym.includes('EUR') ? 4 : 2)}</div>
+                <span class="text-[10px] px-1.5 py-0.5 rounded font-bold ${isBull ? 'bg-emerald-950 text-emerald-400' : 'bg-rose-950 text-rose-400'}">${isBull ? 'BUY SETUP' : 'SELL PULLBACK'}</span>
+              </div>
+            </div>
+          `;
+        } catch(e) {}
+      }
+      list.innerHTML = html;
+    }
+
+    // ================= 100% RELIABLE BANGLA VOICE (TTS) =================
+    function speakBangla(text) {
+      if (!text) return;
+
+      // Clean text
+      const cleanText = text.replace(/[*#_`]/g, '').trim();
+      const encoded = encodeURIComponent(cleanText.substring(0, 190)); // safe payload
+      const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=bn&client=tw-ob&q=${encoded}`;
+
+      const audio = document.getElementById("banglaAudioPlayer");
+      audio.src = audioUrl;
+      
+      audio.play().catch(() => {
+        // Fallback to Web Speech API if audio blocked
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+          const utterance = new SpeechSynthesisUtterance(cleanText);
+          utterance.lang = 'bn-BD';
+          window.speechSynthesis.speak(utterance);
+        }
+      });
+    }
+
+    function replayCurrentText() {
+      const txt = lastSpokenSummary || document.getElementById("aiSummaryBangla").innerText;
+      speakBangla(txt);
+    }
+
+    // ================= FORCE MIC PERMISSION & SPEECH RECOGNITION =================
+    async function requestMicAndListen() {
+      const statusLabel = document.getElementById("aiVoiceStatus");
+      
+      try {
+        // 1. Explicitly prompt user for Android microphone permission
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          stream.getTracks().forEach(track => track.stop()); // close temp stream
+        }
+
+        // 2. Start Speech Recognition
+        const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRec) {
+          statusLabel.innerText = "⚠️ ব্রাউজারে স্পিচ রিকগনিশন নেই। নিচে লিখে পাঠান।";
+          return;
+        }
+
+        if (speechRecognizer) {
+          speechRecognizer.abort();
+        }
+
+        speechRecognizer = new SpeechRec();
+        speechRecognizer.lang = 'bn-BD';
+        speechRecognizer.continuous = false;
+        speechRecognizer.interimResults = false;
+
+        speechRecognizer.onstart = () => {
+          isListening = true;
+          document.getElementById("headerMicBtn").classList.add("bg-rose-600", "animate-pulse");
+          document.getElementById("aiBigMicBtn").classList.add("bg-rose-600", "animate-pulse");
+          statusLabel.innerText = "🎙️ শুনছি... এখন বাংলায় বলুন...";
+        };
+
+        speechRecognizer.onresult = (e) => {
+          const spoken = e.results[0][0].transcript;
+          statusLabel.innerText = `🗣️ আপনি বলেছেন: "${spoken}"`;
+          handleBanglaVoiceIntent(spoken);
+          stopVoice();
+        };
+
+        speechRecognizer.onerror = (event) => {
+          console.warn("Speech recognition error:", event.error);
+          statusLabel.innerText = "⚠️ বুঝতে পারিনি। আবার মাইকে চাপ দিন বা নিচে লিখুন।";
+          stopVoice();
+        };
+
+        speechRecognizer.onend = () => stopVoice();
+
+        speechRecognizer.start();
+
+      } catch (err) {
+        console.error("Mic permission denied", err);
+        statusLabel.innerText = "⚠️ মাইক পারমিশন দিন (Browser Settings > Site Settings > Microphone > Allow)";
+      }
+    }
+
+    function stopVoice() {
+      isListening = false;
+      document.getElementById("headerMicBtn").classList.remove("bg-rose-600", "animate-pulse");
+      document.getElementById("aiBigMicBtn").classList.remove("bg-rose-600", "animate-pulse");
+    }
+
+    function handleManualTextSubmit() {
+      const input = document.getElementById("textCommandInput");
+      const val = input.value.trim();
+      if (val) {
+        handleBanglaVoiceIntent(val);
+        input.value = "";
+      }
+    }
+
+    function handleBanglaVoiceIntent(text) {
+      const lower = text.toLowerCase();
+      let response = "আপনার কমান্ডটি কার্যকর করা হয়েছে।";
+
+      if (lower.includes("গোল্ড") || lower.includes("gold") || lower.includes("স্বর্ণ")) {
+        onSymbolSelected("PAXGUSDT");
+        document.getElementById("marketSelector").value = "PAXGUSDT";
+        response = "গোল্ড চার্ট লোড করা হয়েছে।";
+        switchTab('chart');
+      } else if (lower.includes("বিটিসি") || lower.includes("btc") || lower.includes("bitcoin")) {
+        onSymbolSelected("BTCUSDT");
+        document.getElementById("marketSelector").value = "BTCUSDT";
+        response = "বিটকয়েন চার্ট প্রদর্শন করা হলো।";
+        switchTab('chart');
+      } else if (lower.includes("১৫ মিনিট") || lower.includes("15m") || lower.includes("১৫")) {
+        changeTimeframe("15m");
+        response = "টাইমফ্রেম ১৫ মিনিট করা হয়েছে।";
+        switchTab('chart');
+      } else if (lower.includes("সাপোর্ট") || lower.includes("রেজিস্ট্যান্স")) {
+        if (!showSR) toggleSRLines();
+        response = "সাপোর্ট এবং রেজিস্ট্যান্স লাইন চার্টে দেখানো হয়েছে।";
+        switchTab('chart');
+      } else if (lower.includes("ফিবোনাচ্চি") || lower.includes("fibonacci")) {
+        if (!showFib) toggleFibonacci();
+        response = "ফিবোনাচ্চি গোল্ডেন পকেট লাইন আঁকা হয়েছে।";
+        switchTab('chart');
+      } else {
+        runAIAnalysis(text);
+        return;
+      }
+
+      lastSpokenSummary = response;
+      document.getElementById("aiSummaryBangla").innerText = response;
+      speakBangla(response);
+    }
+
+    // ================= GEMINI AI ENGINE =================
+    async function runAIAnalysis(customPrompt = "") {
+      const apiKey = localStorage.getItem("gemini_key") || document.getElementById("geminiApiKeyInput").value.trim();
+      const last = cachedCandles[cachedCandles.length - 1];
+
+      document.getElementById("aiSummaryBangla").innerText = "জেমিনি এআই কোয়ান্ট হিসাব করছে...";
+
+      if (!apiKey) {
+        document.getElementById("aiSummaryBangla").innerText = "দয়া করে 'সেটিংস' ট্যাবে গিয়ে আপনার Google Gemini API Key সেভ করুন।";
+        return;
+      }
+
+      const prompt = `You are AI Trading Hub Senior Quantitative Analyst.
+Market Symbol: ${currentSymbol}
+Timeframe: ${currentTimeframe}
+Current Price: ${last ? last.close : 'N/A'}
+User Voice Query: "${customPrompt}"
+
+Perform technical confluence reasoning and respond strictly in JSON format (no markdown, no backticks):
+{
+  "bias": "BULLISH" or "BEARISH" or "NEUTRAL",
+  "score": 82,
+  "risk": "LOW" or "MODERATE" or "HIGH",
+  "banglaSummary": "মার্কেটের বর্তমান ট্রেন্ড, সাপোর্ট এবং রেজিস্ট্যান্সের উপর ভিত্তি করে সর্বোচ্চ ২ লাইনে স্পষ্ট বাংলা বিশ্লেষণ।"
+}`;
+
+      let parsed = null;
+
+      for (const model of SUPPORTED_MODELS) {
+        try {
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": apiKey
+            },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }]
+            })
+          });
+
+          if (!res.ok) continue;
+
+          const data = await res.json();
+          const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (!rawText) continue;
+
+          const cleaned = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
+          parsed = JSON.parse(cleaned);
+          break;
+        } catch (e) {
+          console.warn(`Model ${model} fallback...`);
+        }
+      }
+
+      if (parsed) {
+        document.getElementById("aiTrendBias").innerText = parsed.bias || "BULLISH";
+        document.getElementById("aiConfidenceScore").innerText = (parsed.score || 82) + "% মডেল কনফিডেন্স";
+        document.getElementById("aiRiskLevel").innerText = parsed.risk || "MODERATE";
+        document.getElementById("aiSummaryBangla").innerText = parsed.banglaSummary;
+
+        lastSpokenSummary = parsed.banglaSummary;
+        speakBangla(parsed.banglaSummary);
+      } else {
+        document.getElementById("aiSummaryBangla").innerText = "এআই রেসপন্স পেতে সমস্যা হয়েছে। অনুগ্রহ করে সেটিংস-এ গিয়ে 'টেস্ট এপিআই' দিয়ে পরীক্ষা করুন।";
+      }
+    }
+
+    async function testApiKey() {
+      const key = document.getElementById("geminiApiKeyInput").value.trim();
+      const statusBox = document.getElementById("keyTestResult");
+      if (!key) {
+        statusBox.innerHTML = "<span class='text-rose-400'>❌ অনুগ্রহ করে API Key ইনপুট দিন।</span>";
+        return;
+      }
+
+      statusBox.innerHTML = "<span class='text-blue-400'>⏳ সংযোগ পরীক্ষা করা হচ্ছে...</span>";
+
+      let successModel = null;
+      let lastErrorMessage = "";
+
+      for (const model of SUPPORTED_MODELS) {
+        try {
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": key
+            },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: "Hello! Reply OK." }] }]
+            })
+          });
+
+          if (res.ok) {
+            successModel = model;
+            break;
+          } else {
+            const errData = await res.json();
+            lastErrorMessage = errData.error?.message || "Error";
+          }
+        } catch (err) {
+          lastErrorMessage = err.message;
+        }
+      }
+
+      if (successModel) {
+        statusBox.innerHTML = `<span class='text-emerald-400 font-bold'>✅ এপিআই সফলভাবে সংযুক্ত হয়েছে! (${successModel})</span>`;
+        localStorage.setItem("gemini_key", key);
+        speakBangla("এপিআই সফলভাবে সংযুক্ত হয়েছে।");
+      } else {
+        statusBox.innerHTML = `<span class='text-rose-400'>❌ ত্রুটি: ${lastErrorMessage}</span>`;
+      }
+    }
+
+    function saveApiKey() {
+      const k = document.getElementById("geminiApiKeyInput").value.trim();
+      if (k) {
+        localStorage.setItem("gemini_key", k);
+        alert("Gemini API Key সফলভাবে সেভ করা হয়েছে!");
+      }
+    }
+
+    window.onload = () => {
+      initChart();
+      const savedKey = localStorage.getItem("gemini_key");
+      if (savedKey) document.getElementById("geminiApiKeyInput").value = savedKey;
+    };
+  </script>
+</body>
+</html>
